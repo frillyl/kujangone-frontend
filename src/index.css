@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Font */
+  --font-default: "Inter", sans-serif;
+
+  /* Colors */
+  /* Primary */
+  --color-primary-base: #006A4E;
+  --color-primary-light: #33856F;
+  --color-primary-dark: #004235;
+  /* Secondary */
+  --color-secondary-base: #800000;
+  --color-secondary-light: #993333;
+  --color-secondary-dark: #4D0000;
+  /* Accent */
+  --color-accent-base: #C19A6B;
+  --color-accent-light: #D9BFA1;
+  --color-accent-dark: #8C6B3D;
+  /* Feedback */
+  /* Danger */
+  --color-danger-base: #DC2626;
+  --color-danger-light: #F87171;
+  --color-danger-dark: #991B1B;
+  /* Warning */
+  --color-warning-base: #F59E0B;
+  --color-warning-light: #FBBF24;
+  --color-warning-dark: #B45309;
+  /* Success */
+  --color-success-base: #16A34A;
+  --color-success-light: #4ADE80;
+  --color-success-dark: #166534;
+  /* Info */
+  --color-info-base: #2563EB;
+  --color-info-light: #60A5FA;
+  --color-info-dark: #1E3A8A;
+}
+
+body {
+  font-family: var(--font-default);
+}
+
+#main-content .swal2-container {
+  position: absolute !important;
+  inset: 0; /* full cover */
+}
