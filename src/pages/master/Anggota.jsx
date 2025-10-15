@@ -1,30 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Swal from "sweetalert2";
+import axios from "axios";
+import { getAnggota, addAnggota, updateAnggota, deleteAnggota } from "../../api/anggotaApi";
 import { EyeIcon, PencilSquareIcon, TrashIcon, ArrowPathIcon, PlusIcon, XMarkIcon, UserGroupIcon, UserPlusIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 
 export default function Anggota() {
-    const [data, setData] = useState([
-        { id: 1, nama: "Aldi Ardiasyah", nrp: "21232506", pangkat: "Serda", status: "Aktif", email: "aldi@example.com", no_hp: "08123456789", created_at: "2025-09-01", created_by: "Admin", edited_at: "2025-09-20", edited_by: "Admin", },
-        { id: 2, nama: "Bayu Baskara", nrp: "32343617", pangkat: "Prada", status: "Tidak Aktif", email: "bayu@example.com", no_hp: "08123456789", created_at: "2025-09-01", created_by: "Admin", edited_at: "2025-09-20", edited_by: "Admin", },
-        { id: 3, nama: "Chandra Cakrawala", nrp: "12141617", pangkat: "Pratu", status: "Aktif", email: "chandra@example.com", no_hp: "08123456789", created_at: "2025-09-01", created_by: "Admin", edited_at: "2025-09-20", edited_by: "Admin", },
-        { id: 4, nama: "Dani Darma", nrp: "23252708", pangkat: "Serka", status: "Aktif", email: "dani@example.com", no_hp: "08123456789", created_at: "2025-09-01", created_by: "Admin", edited_at: "2025-09-20", edited_by: "Admin", },
-        { id: 5, nama: "Evan Elkana", nrp: "12341617", pangkat: "Serma", status: "Aktif", email: "evan@example.com", no_hp: "08123456789", created_at: "2025-09-01", created_by: "Admin", edited_at: "2025-09-20", edited_by: "Admin", },
-    ]);
-
+    const [data, setData] = useState([]);
     const [modalType, setModalType] = useState(null);
     const [selected, setSelected] = useState(null);
-
     const [search, setSearch] = useState("");
-
+    const [loading, setLoading] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 10;
 
-    const filteredData = data.filter((item) => 
-        item.nama.toLowerCase().includes(search.toLowerCase())
-    );
-    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-    const startIdx = (currentPage - 1) * itemsPerPage;
-    const paginatedData = filteredData.slice(startIdx, startIdx + itemsPerPage);
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const res = await getAnggota();
+            setData(res.data);
+        } catch (err) {
+            console.error(err);
+            Swal.fire("Gagal!", "Tidak dapat memuat data anggota.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     const openDetail = (item) => {
         setSelected(item);
@@ -57,18 +61,74 @@ export default function Anggota() {
             cancelButtonColor: "#6B7280",
             confirmButtonText: "Ya, Hapus!",
             cancelButtonText: "Batal",
-        }).then((result) => {
+        }).then(async (result) => {
             if (result.isConfirmed) {
-                setData(data.filter((d) => d.id !== item.id));
-                Swal.fire({
-                    target: document.getElementById('main-content'),
-                    title: "Terhapus!",
-                    text: "Data berhasil dihapus.",
-                    icon: "success",
-                });
+                try {
+                    await deleteAnggota(item._id);
+                    Swal.fire({
+                        target: document.getElementById('main-content'),
+                        title: "Terhapus!",
+                        text: "Data berhasil dihapus.",
+                        icon: "success",
+                    });
+                    fetchData();
+                } catch (err) {
+                    Swal.fire({
+                        target: document.getElementById('main-content'),
+                        title: "Gagal!",
+                        text: "Tidak dapat menghapus data.",
+                        icon: "error"
+                    });
+                }
             }
         });
     };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const payload = Object.fromEntries(formData.entries());
+
+        if (!payload.nama || !payload.nrp || !payload.status) {
+            Swal.fire({
+                target: document.getElementById('main-content'),
+                title: "Validasi!",
+                text: "Nama, NRP, dan Status wajib diisi.",
+                icon: "warning"
+            });
+            return;
+        } try {
+            if (selected) {
+                await updateAnggota(selected._id, payload);
+                Swal.fire({
+                    target: document.getElementById('main-content'),
+                    title: "Berhasil!",
+                    text: "Data anggota berhasil diperbarui.",
+                    icon: "success"
+                });
+            } else {
+                await addAnggota(payload);
+                Swal.fire({
+                    target: document.getElementById('main-content'),
+                    title: "Berhasil!",
+                    text: "Data anggota berhasil ditambahkan.",
+                    icon: "success"
+                });
+            }
+            closeModal();
+            fetchData();
+        } catch (err) {
+            const msg = err.response?.data?.message || "Terjadi kesalahan server.";
+            Swal.fire("Gagal!", msg, "error");
+        }
+    };
+
+    const filteredData = data.filter((item) => 
+        item.nama.toLowerCase().includes(search.toLowerCase())
+    );
+    const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const paginatedData = filteredData.slice(startIdx, startIdx + itemsPerPage);
 
     const confirmReset = (item) => {
         Swal.fire({
@@ -136,62 +196,68 @@ export default function Anggota() {
 
             {/* Table */}
             <div className="overflow-x-auto">
-                <table className="min-w-full text-xs sm:text-sm md:text-base border-separate border-spacing-y-2">
-                    <thead>
-                        <tr className="bg-primary-light text-white">
-                            <th className="px-2 py-1 sm:px-4 sm:py-2 rounded-l-md">No.</th>
-                            <th className="px-2 py-1 sm:px-4 sm:py-2">Nama</th>
-                            <th className="hidden md:table-cell px-2 py-1 sm:px-4 sm:py-2">NRP</th>
-                            <th className="hidden lg:table-cell px-2 py-1 sm:px-4 sm:py-2">Pangkat</th>
-                            <th className="px-2 py-1 sm:px-4 sm:py-2">Status</th>
-                            <th className="px-2 py-1 sm:px-4 sm:py-2 rounded-r-md">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredData.length === 0 ? (
-                            <tr>
-                                <td colSpan="6" className="text-center py-6 text-gray-500">
-                                    Data yang Anda cari tidak ditemukan
-                                </td>
+                {loading ? (
+                    <div className="text-center py-6 text-gray-500">
+                        Memuat data...
+                    </div>
+                ) : (
+                    <table className="min-w-full text-xs sm:text-sm md:text-base border-separate border-spacing-y-2">
+                        <thead>
+                            <tr className="bg-primary-light text-white">
+                                <th className="px-2 py-1 sm:px-4 sm:py-2 rounded-l-md">No.</th>
+                                <th className="px-2 py-1 sm:px-4 sm:py-2">Nama</th>
+                                <th className="hidden md:table-cell px-2 py-1 sm:px-4 sm:py-2">NRP</th>
+                                <th className="hidden lg:table-cell px-2 py-1 sm:px-4 sm:py-2">Pangkat</th>
+                                <th className="px-2 py-1 sm:px-4 sm:py-2">Status</th>
+                                <th className="px-2 py-1 sm:px-4 sm:py-2 rounded-r-md">Aksi</th>
                             </tr>
-                        ) : (
-                            paginatedData.map((item, idx) => (
-                                <tr key={item.id} className="bg-white hover:bg-gray-50 shadow-sm transition">
-                                    <td className="px-2 py-1 sm:px-4 sm:py-2">{startIdx + idx + 1}.</td>
-                                    <td className="px-2 py-1 sm:px-4 sm:py-2">{item.nama}</td>
-                                    <td className="hidden md:table-cell px-2 py-1 sm:px-4 sm:py-2">{item.nrp}</td>
-                                    <td className="hidden lg:table-cell px-2 py-1 sm:px-4 sm:py-2">{item.pangkat}</td>
-                                    <td
-                                        className={`px-2 py-1 sm:px-4 sm:py-2 font-medium ${
-                                            item.status === "Aktif"
-                                                ? "text-success-base"
-                                                : "text-danger-base"
-                                        }`}
-                                    >
-                                        {item.status}
-                                    </td>
-                                    <td className="px-2 py-1 sm:px-4 sm:py-2 flex gap-2 sm:gap-3">
-                                        <EyeIcon
-                                            onClick={() => openDetail(item)}
-                                            className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 cursor-pointer hover:text-info-base" />
-                                        <PencilSquareIcon
-                                            onClick={() => openForm(item)}
-                                            className="w-4 h-4 sm:w-5 sm:h-5 text-primary-base cursor-pointer hover:text-primary-dark" />
-                                        <TrashIcon
-                                            onClick={() => confirmDelete(item)}
-                                            className="w-4 h-4 sm:w-5 sm:h-5 text-danger-base cursor-pointer hover:text-danger-dark" />
-                                        <ArrowPathIcon
-                                            onClick={() => confirmReset(item)}
-                                            className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 cursor-pointer hover:text-warning-base" />
-                                        <UserPlusIcon
-                                            onClick={() => assignForm(item)}
-                                            className="w-4 h-4 sm:w-5 sm:h-5 text-success-base cursor-pointer hover:text-success-dark"/>
+                        </thead>
+                        <tbody>
+                            {filteredData.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="text-center py-6 text-gray-500">
+                                        Data yang Anda cari tidak ditemukan
                                     </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                            ) : (
+                                paginatedData.map((item, idx) => (
+                                    <tr key={item.id} className="bg-white hover:bg-gray-50 shadow-sm transition">
+                                        <td className="px-2 py-1 sm:px-4 sm:py-2">{startIdx + idx + 1}.</td>
+                                        <td className="px-2 py-1 sm:px-4 sm:py-2">{item.nama}</td>
+                                        <td className="hidden md:table-cell px-2 py-1 sm:px-4 sm:py-2">{item.nrp}</td>
+                                        <td className="hidden lg:table-cell px-2 py-1 sm:px-4 sm:py-2">{item.pangkat}</td>
+                                        <td
+                                            className={`px-2 py-1 sm:px-4 sm:py-2 font-medium ${
+                                                item.status === "Aktif"
+                                                    ? "text-success-base"
+                                                    : "text-danger-base"
+                                            }`}
+                                        >
+                                            {item.status}
+                                        </td>
+                                        <td className="px-2 py-1 sm:px-4 sm:py-2 flex gap-2 sm:gap-3">
+                                            <EyeIcon
+                                                onClick={() => openDetail(item)}
+                                                className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 cursor-pointer hover:text-info-base" />
+                                            <PencilSquareIcon
+                                                onClick={() => openForm(item)}
+                                                className="w-4 h-4 sm:w-5 sm:h-5 text-primary-base cursor-pointer hover:text-primary-dark" />
+                                            <TrashIcon
+                                                onClick={() => confirmDelete(item)}
+                                                className="w-4 h-4 sm:w-5 sm:h-5 text-danger-base cursor-pointer hover:text-danger-dark" />
+                                            <ArrowPathIcon
+                                                onClick={() => confirmReset(item)}
+                                                className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 cursor-pointer hover:text-warning-base" />
+                                            <UserPlusIcon
+                                                onClick={() => assignForm(item)}
+                                                className="w-4 h-4 sm:w-5 sm:h-5 text-success-base cursor-pointer hover:text-success-dark"/>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                )}
             </div>
 
             {/* Pagination */}
@@ -292,74 +358,80 @@ export default function Anggota() {
                         <h2 className="text-lg sm:text-xl font-bold mb-4 text-primary-base">
                             {selected ? "Edit Anggota" : "Tambah Anggota"}
                         </h2>
-                        <form className="space-y-3 sm:space-y-4 text-xs sm:text-sm md:text-base">
+                        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 text-xs sm:text-sm md:text-base">
                             <input
                                 type="text"
+                                name="nama"
                                 defaultValue={selected?.nama || ""}
                                 placeholder="Nama"
                                 className="w-full border rounded-lg px-2 py-1 sm:px-3 sm:py-2 focus:ring-2 focus:ring-primary-base"
                             />
                             <input
                                 type="text"
+                                name="nrp"
                                 defaultValue={selected?.nrp || ""}
                                 placeholder="NRP"
                                 className="w-full border rounded-lg px-2 py-1 sm:px-3 sm:py-2 focus:ring-2 focus:ring-primary-base"
                             />
                             <select
+                                name="pangkat"
                                 defaultValue={selected?.pangkat || ""}
                                 className="w-full border rounded-lg px-2 py-1 sm:px-3 sm:py-2 focus:ring-2 focus:ring-primary-base"
                             >
                                 <option value="" disabled>--- Pilih Pangkat ---</option>
                                 <optgroup label="Tamtama">
-                                    <option value="prada">Prada</option>
-                                    <option value="pratu">Pratu</option>
-                                    <option value="praka">Praka</option>
-                                    <option value="kopda">Kopda</option>
-                                    <option value="koptu">Koptu</option>
-                                    <option value="kopka">Kopka</option>
+                                    <option value="Prada">Prada</option>
+                                    <option value="Pratu">Pratu</option>
+                                    <option value="Praka">Praka</option>
+                                    <option value="Kopda">Kopda</option>
+                                    <option value="Koptu">Koptu</option>
+                                    <option value="Kopka">Kopka</option>
                                 </optgroup>
                                 <optgroup label="Bintara">
-                                    <option value="serda">Serda</option>
-                                    <option value="sertu">Sertu</option>
-                                    <option value="serka">Serka</option>
-                                    <option value="serma">Serma</option>
-                                    <option value="pelda">Pelda</option>
-                                    <option value="peltu">Peltu</option>
+                                    <option value="Serda">Serda</option>
+                                    <option value="Sertu">Sertu</option>
+                                    <option value="Serka">Serka</option>
+                                    <option value="Serma">Serma</option>
+                                    <option value="Pelda">Pelda</option>
+                                    <option value="Peltu">Peltu</option>
                                 </optgroup>
                                 <optgroup label="Perwira Pertama">
-                                    <option value="letda">Letda</option>
-                                    <option value="lettu">Lettu</option>
-                                    <option value="kapten">Kapten</option>
+                                    <option value="Letda">Letda</option>
+                                    <option value="Lettu">Lettu</option>
+                                    <option value="Kapten">Kapten</option>
                                 </optgroup>
                                 <optgroup label="Perwira Menengah">
-                                    <option value="mayor">Mayor</option>
-                                    <option value="letkol">Letkol</option>
-                                    <option value="kolonel">Kolonel</option>
+                                    <option value="Mayor">Mayor</option>
+                                    <option value="Letkol">Letkol</option>
+                                    <option value="Kolonel">Kolonel</option>
                                 </optgroup>
                                 <optgroup label="Perwira Tinggi">
-                                    <option value="brigjen">Brigjen</option>
-                                    <option value="mayjen">Mayjen</option>
-                                    <option value="letjen">Letjen</option>
-                                    <option value="jenderal">Jenderal</option>
+                                    <option value="Brigjen">Brigjen</option>
+                                    <option value="Mayjen">Mayjen</option>
+                                    <option value="Letjen">Letjen</option>
+                                    <option value="Jenderal">Jenderal</option>
                                 </optgroup>
                             </select>
                             <select
+                                name="status"
                                 defaultValue={selected?.status || ""}
                                 className="w-full border rounded-lg px-2 py-1 sm:px-3 sm:py-2 focus:ring-2 focus:ring-primary-base"
                             >
                                 <option value="" disabled>--- Pilih Status ---</option>
-                                <option value="aktif">Aktif</option>
-                                <option value="non-aktif">Tidak Aktif</option>
+                                <option value="Aktif">Aktif</option>
+                                <option value="Non-Aktif">Tidak Aktif</option>
                             </select>
                             <input
                                 type="email"
+                                name="email"
                                 defaultValue={selected?.email || ""}
                                 placeholder="Email"
                                 className="w-full border rounded-lg px-2 py-1 sm:px-3 sm:py-2 focus:ring-2 focus:ring-primary-base"
                             />
                             <input
                                 type="text"
-                                defaultValue={selected?.no_hp || ""}
+                                name="noHp"
+                                defaultValue={selected?.noHp || ""}
                                 placeholder="No Handphone"
                                 className="w-full border rounded-lg px-2 py-1 sm:px-3 sm:py-2 focus:ring-2 focus:ring-primary-base"
                             />
